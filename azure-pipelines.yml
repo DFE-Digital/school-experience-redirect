@@ -1,0 +1,22 @@
+pool:
+  vmImage: 'ubuntu-16.04'
+
+variables:
+  imageName: redirect-nginx
+  imageTag: v$(Build.BuildNumber)
+
+steps:
+  - script: docker login $(dockerRegistry) -u $(dockerId) -p $pswd
+    env:
+      pswd: $(dockerPassword)
+    displayName: 'Docker login'
+
+  - script: docker build -f Dockerfile -t $(dockerRegistry)/$(imageName):$(imageTag) .
+    displayName: Build Docker Image 
+
+  - script: |
+      docker push $(dockerRegistry)/$(imageName):$(imageTag)
+      docker tag $(dockerRegistry)/$(imageName):$(imageTag) $(dockerRegistry)/$(imageName):latest
+      docker push $(dockerRegistry)/$(imageName):latest
+    displayName: 'Push Docker image'
+
