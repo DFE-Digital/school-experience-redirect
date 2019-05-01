@@ -1,0 +1,193 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "environmentName": {
+            "type": "string",
+            "allowedValues": [
+              "dev",
+              "staging",
+              "prod"
+            ],
+            "metadata": {
+                "description": "Specify either dev, test or prod for configuration values."
+            }
+        },
+        "SEP_DOMAIN": {
+            "type": "String"
+        },
+        "NEW_DOMAIN": {
+            "type": "String"
+        },
+        "registry_name": {
+            "type": "String"
+        },
+        "serverfarms_serviceplan_name": {
+            "type": "String"
+        },
+        "location": {
+            "type": "String",
+            "defaultValue": "uksouth"
+        },
+        "sku": {
+            "type": "object",
+            "defaultValue": {
+                "name": "B1",
+                "tier": "Basic",
+                "size": "B1",
+                "family": "B",
+                "capacity": 1
+            }
+        },
+        "ipAddressRestriction": {
+             "type": "string",
+             "defaultValue": "0.0.0.0/0"
+        },
+        "sites_school_experience_name": {
+             "type": "string"
+        },
+        "logsDirectorySizeLimit": {
+             "type": "string",
+             "defaultValue": "100"
+        },
+        "config_web_name": {
+            "defaultValue": "web",
+            "type": "string"
+        },
+        "registryGroupName": {
+            "type": "string",
+            "defaultValue": "schoolExperienceGroup"
+        },
+        "imageTag": {
+            "type": "string",
+            "defaultValue": "latest"
+        }
+    },
+    "variables": {
+        "dockerRegistryUrl": "[concat('https://',toLower(parameters('registry_name')), '.azurecr.io')]",
+        "ipSecurityRestriction": {
+            "ipAddress": "[parameters('ipAddressRestriction')]",
+            "name": "denyaccess",
+            "description": "Deny Access",
+            "action": "Deny"
+        },
+        "emptyArray": []
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Web/sites",
+            "kind": "app,linux,container",
+            "name": "[parameters('sites_school_experience_name')]",
+            "apiVersion": "2016-08-01",
+            "location": "[parameters('location')]",
+            "scale": null,
+            "properties": {
+                "enabled": true,
+                "hostNameSslStates": [
+                    {
+                        "name": "[concat(parameters('sites_school_experience_name'),'.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "virtualIP": null,
+                        "thumbprint": null,
+                        "toUpdate": null,
+                        "hostType": "Standard"
+                    },
+                    {
+                        "name": "[concat(parameters('sites_school_experience_name'),'.scm.azurewebsites.net')]",
+                        "sslState": "Disabled",
+                        "virtualIP": null,
+                        "thumbprint": null,
+                        "toUpdate": null,
+                        "hostType": "Repository"
+                    }
+                ],
+                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_serviceplan_name'))]",
+                "reserved": true,
+                "siteConfig": {
+                    "linuxFxVersion": "[concat('DOCKER|', parameters('registry_name'), '.azurecr.io/redirect-nginx:' , parameters('imageTag'))]",
+                    "alwaysOn": true,
+                    "appSettings": [
+                        {
+                            "name": "WEBSITES_ENABLE_APP_SERVICE_STORAGE",
+                            "value": "false"
+                        },
+                        {
+                            "name": "DOCKER_REGISTRY_URL",
+                            "value": "[variables('dockerRegistryUrl')]"
+                        },
+                        {
+                            "name": "DOCKER_REGISTRY_SERVER_USERNAME",
+                            "value": "[parameters('registry_name')]"
+                        },
+                        {
+                            "name": "DOCKER_REGISTRY_SERVER_PASSWORD",
+                            "value": "[listCredentials(resourceId(parameters('registryGroupName'), 'Microsoft.ContainerRegistry/registries', parameters('registry_name')), '2017-10-01').passwords[0].value]"
+                        },
+                        {
+                            "name": "SEP_DOMAIN",
+                            "value": "[parameters('SEP_DOMAIN')]"
+                        },
+                        {
+                            "name": "NEW_DOMAIN",
+                            "value": "[parameters('NEW_DOMAIN')]"
+                        }
+                    ]
+                },
+                "scmSiteAlsoStopped": false,
+                "hostingEnvironmentProfile": null,
+                "clientAffinityEnabled": false,
+                "clientCertEnabled": false,
+                "hostNamesDisabled": false,
+                "containerSize": 0,
+                "dailyMemoryTimeQuota": 0,
+                "cloningInfo": null,
+                "httpsOnly": true
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/serverfarms', parameters('serverfarms_serviceplan_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Web/serverfarms",
+            "sku": "[parameters('sku')]",
+            "kind": "linux",
+            "name": "[parameters('serverfarms_serviceplan_name')]",
+            "apiVersion": "2016-09-01",
+            "location": "[parameters('location')]",
+            "scale": null,
+            "properties": {
+                "name": "[parameters('serverfarms_serviceplan_name')]",
+                "workerTierName": null,
+                "adminSiteName": null,
+                "hostingEnvironmentProfile": null,
+                "perSiteScaling": false,
+                "reserved": true,
+                "targetWorkerCount": 0,
+                "targetWorkerSizeId": 0
+            },
+            "dependsOn": []
+        },
+        {
+            "type": "Microsoft.Web/sites/config",
+            "name": "[concat(parameters('sites_school_experience_name'), '/', parameters('config_web_name'))]",
+            "apiVersion": "2018-02-01",
+            "location": "[parameters('location')]",
+            "scale": null,
+            "properties": {
+                "requestTracingEnabled": false,
+                "httpLoggingEnabled": true,
+                "logsDirectorySizeLimit": "[parameters('logsDirectorySizeLimit')]",
+                "detailedErrorLoggingEnabled": false,
+                "webSocketsEnabled": false,
+                "alwaysOn": true,
+                "managedPipelineMode": "Integrated",
+                "minTlsVersion": "1.2",
+                "ftpsState": "Disabled",
+                "ipSecurityRestrictions": "[if(equals(parameters('environmentName'), 'dev'),  array(variables('ipSecurityRestriction')), variables('emptyArray'))]"
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/sites', parameters('sites_school_experience_name'))]"
+            ]
+        }
+    ]
+}
