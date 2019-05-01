@@ -3,7 +3,7 @@ pool:
 
 variables:
   imageName: redirect-nginx
-  imageTag: v$(Build.BuildNumber)
+  imageTag: v$(Build.BuildId)
 
 steps:
   - script: docker login $(dockerRegistry) -u $(dockerId) -p $pswd
