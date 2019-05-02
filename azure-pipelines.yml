@@ -20,3 +20,13 @@ steps:
       docker push $(dockerRegistry)/$(imageName):latest
     displayName: 'Push Docker image'
 
+  - task: CopyFiles@2
+    inputs:
+      contents: 'script/openfirewalltoagent.sh'
+      targetFolder: $(Build.ArtifactStagingDirectory)
+    displayName: 'Copy script/openfirewalltoagent.sh script'
+  - task: PublishBuildArtifacts@1
+    inputs:
+      pathtoPublish: $(Build.ArtifactStagingDirectory)/script/openfirewalltoagent.sh
+      artifactName: 'firewall-script'
+    displayName: 'Publish script/openfirewalltoagent.sh'
